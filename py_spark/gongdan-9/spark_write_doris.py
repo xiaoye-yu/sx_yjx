@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-
+from pyspark.sql.types import StringType, IntegerType, TimestampType, DateType
 
 def read_and_write_unified_traffic():
     # 初始化SparkSession
@@ -100,15 +100,45 @@ def read_and_write_unified_traffic():
         df.show(5, truncate=False)
 
         # 写入到目标表dwd_traffic_unified_detail
+        # 写入参数中添加会话初始化语句，强制类型兼容
         write_params = jdbc_base_params.copy()
         write_params["dbtable"] = "dwd_traffic_unified_detail"
+        # 关键参数：禁用自动建表，指定Doris兼容的字段类型
+        write_params["createTableIfNotExists"] = "false"  # 明确不创建表
+        write_params["createTableColumnTypes"] = (  # 即使表存在，也指定类型映射
+            "data_type VARCHAR(100), "
+            "visitor_id VARCHAR(100), "
+            "store_id VARCHAR(50), "
+            "page_type VARCHAR(50), "
+            "page_category VARCHAR(50), "
+            "page_subtype VARCHAR(50), "
+            "source_page VARCHAR(200), "
+            "target_page VARCHAR(200), "
+            "visit_time VARCHAR(200), "
+            "is_buy INT, "
+            "stay_time INT, "
+            "dt DATE"
+        )
 
-        # 写入模式：如果表存在则覆盖，可根据需要修改为append（追加）或ignore（忽略）
+        # 写入数据（保持模式为append）
+        df = df.withColumn("data_type", df["data_type"].cast(StringType())) \
+            .withColumn("visitor_id", df["visitor_id"].cast(StringType())) \
+            .withColumn("store_id", df["store_id"].cast(StringType())) \
+            .withColumn("page_type", df["page_type"].cast(StringType())) \
+            .withColumn("page_category", df["page_category"].cast(StringType())) \
+            .withColumn("page_subtype", df["page_subtype"].cast(StringType())) \
+            .withColumn("source_page", df["source_page"].cast(StringType())) \
+            .withColumn("target_page", df["target_page"].cast(StringType())) \
+            .withColumn("visit_time", df["visit_time"].cast(StringType())) \
+            .withColumn("is_buy", df["is_buy"].cast(IntegerType())) \
+            .withColumn("stay_time", df["stay_time"].cast(IntegerType())) \
+            .withColumn("dt", df["dt"].cast(DateType()))
         df.write \
             .format("jdbc") \
             .options(**write_params) \
             .mode("append") \
             .save()
+
 
         print("✅ 数据已成功写入 dwd_traffic_unified_detail 表")
 
