@@ -32,8 +32,9 @@ public final class EnvironmentSettingUtils {
     public static void defaultParameter(StreamExecutionEnvironment env) {
         // 开启 checkpoint 支持在 STREAMING 模式下的 FlinkSink 操作
         env.enableCheckpointing(1000 * 30);
+        env.setParallelism(1);
         // 设置状态后端为 RocksDB
-        env.setStateBackend(new EmbeddedRocksDBStateBackend());
+//        env.setStateBackend(new EmbeddedRocksDBStateBackend());
         CheckpointConfig config = env.getCheckpointConfig();
         // 设定语义模式，默认情况是 exactly_once
         config.setCheckpointingMode(CheckpointingMode.EXACTLY_ONCE);
