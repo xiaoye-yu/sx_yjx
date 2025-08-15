@@ -1,7 +1,7 @@
 package com.retailersv;
 
 import com.alibaba.fastjson.JSONObject;
-import com.retailersv.func.ProcessSplitStreamFunc;
+
 import com.stream.common.utils.*;
 import lombok.SneakyThrows;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
@@ -70,7 +70,7 @@ public class DbusLogDataProcess2Kafka {
         );
         SingleOutputStreamOperator<JSONObject> processDs = kafkaSourceDs.process(new ProcessFunction<String, JSONObject>() {
                     @Override
-                    public void processElement(String s, ProcessFunction<String, JSONObject>.Context context, Collector<JSONObject> collector) throws Exception {
+                    public void processElement(String s, ProcessFunction<String, JSONObject>.Context context, Collector<JSONObject> collector){
                         try {
                             collector.collect(JSONObject.parseObject(s));
                         } catch (Exception e) {
@@ -95,7 +95,7 @@ public class DbusLogDataProcess2Kafka {
                     private ValueState<String> lastVisitDateState;
 
                     @Override
-                    public void open(Configuration parameters) throws Exception {
+                    public void open(Configuration parameters){
                         // 值状态
                         ValueStateDescriptor<String> valueStateDescriptor = new ValueStateDescriptor<>(
                                 "lastVisitDateState", // 状态名称，用于在状态后端中标识该状态
@@ -149,10 +149,10 @@ public class DbusLogDataProcess2Kafka {
                 }).uid("fix_isNew_map")
                 .name("fix_isNew_map");
 //        mapDs.print("mapDs->");
-        SingleOutputStreamOperator<String> processTagDs = mapDs.process(new ProcessSplitStreamFunc(errTag, startTag, displayTag, actionTag))
+        SingleOutputStreamOperator<String> processTagDs = mapDs.process(new com.retailersv1.func.ProcessSplitStreamFunc(errTag, startTag, displayTag, actionTag))
                 .uid("flag_stream_process")
                 .name("flag_stream_process");
-        processTagDs.print();
+//        processTagDs.print();
         SideOutputDataStream<String> sideOutputErrDs = processTagDs.getSideOutput(errTag);
         SideOutputDataStream<String> sideOutputStartDs = processTagDs.getSideOutput(startTag);
         SideOutputDataStream<String> sideOutputDisplayDs = processTagDs.getSideOutput(displayTag);
@@ -164,10 +164,34 @@ public class DbusLogDataProcess2Kafka {
         collectDsMap.put("actionTag", sideOutputActionDs);
         collectDsMap.put("page",processTagDs);
 
+        SplitDs2kafkaTopicMsg(collectDsMap);
 
-        
+//        env.disableOperatorChaining() 是 Apache Flink 中用于禁用算子链（Operator Chaining） 的操作。
 
-
+        env.disableOperatorChaining();
         env.execute();
+    }
+
+    public static void SplitDs2kafkaTopicMsg(HashMap<String,DataStream<String>> dataStreamHashMap) {
+        dataStreamHashMap.get("errTag").sinkTo(KafkaUtils.buildKafkaSink(kafka_bootstrap_server,kafka_err_log))
+                        .uid("sk_errMsg2Kafka")
+                        .name("_sk_errMsg2Kafka");
+        dataStreamHashMap.get("startTag").sinkTo(KafkaUtils.buildKafkaSink(kafka_bootstrap_server,kafka_start_log))
+                .uid("sk_startMsg2Kafka")
+                .name("_sk_startMsg2Kafka");
+        dataStreamHashMap.get("displayTag").sinkTo(KafkaUtils.buildKafkaSink(kafka_bootstrap_server,kafka_display_log))
+                .uid("sk_displayMsg2Kafka")
+                .name("_sk_displayMsg2Kafka");
+        dataStreamHashMap.get("actionTag").sinkTo(KafkaUtils.buildKafkaSink(kafka_bootstrap_server,kafka_action_log))
+                .uid("sk_actionMsg2Kafka")
+                .name("_sk_actionMsg2Kafka");
+        dataStreamHashMap.get("page").sinkTo(KafkaUtils.buildKafkaSink(kafka_bootstrap_server,kafka_page_topic))
+                .uid("sk_pageMsg2Kafka")
+                .name("_sk_pageMsg2Kafka");
+        dataStreamHashMap.get("errTag").print("errTag ->");
+        dataStreamHashMap.get("startTag").print("startTag ->");
+        dataStreamHashMap.get("displayTag").print("displayTag ->");
+        dataStreamHashMap.get("actionTag").print("actionTag ->");
+        dataStreamHashMap.get("page").print("page ->");
     }
 }

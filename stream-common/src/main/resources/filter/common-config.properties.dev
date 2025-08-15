@@ -6,6 +6,7 @@ mysql.port=3306
 mysql.url=jdbc:mysql://cdh01:3306/realtime_v1?useSSL=false&serverTimezone=Asia/Shanghai
 mysql.timezone=Asia/Shanghai
 mysql.database=realtime_v1
+mysql.databases.conf=realtime_v1_config
 mysql.user=root
 mysql.pwd=123456
 
@@ -24,11 +25,13 @@ kafka.start.log=start_log
 kafka.display.log=display_log
 kafka.action.log=action_log
 kafka.page.topic=ods_page_log
+kafka.cdc.db.topic=ods_ecommerce_order
 
 # Zookeeper 本地配置
 zookeeper.server.host.list=cdh01:2181
 
-# 暂时不用的服务可留空或注释
-holo.endpoint=
-ali.key=
-ali.pwd=
+# Hbase
+hbase.namespace=default
+
+# Hive
+hive.conf.dir=D:/2211a/sx_yjx/stream-realtime/src/main/resources
