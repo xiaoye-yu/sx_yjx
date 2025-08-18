@@ -77,6 +77,7 @@ public class ProcessSpiltStreamToHBaseDimFunc extends BroadcastProcessFunction<J
                     sinkTableName = "default:"+sinkTableName;
                     String hbaseRowKey = after.getString(configMap.get(tableName).getSinkRowKey());
                     Table hbaseConnectionTable = hbaseConnection.getTable(TableName.valueOf(sinkTableName));
+                    // 创建Put对象，使用MD5哈希处理行键
                     Put put = new Put(Bytes.toBytes(MD5Hash.getMD5AsHex(hbaseRowKey.getBytes(StandardCharsets.UTF_8))));
                     for (Map.Entry<String, Object> entry : after.entrySet()) {
                         put.addColumn(Bytes.toBytes("info"),Bytes.toBytes(entry.getKey()),Bytes.toBytes(String.valueOf(entry.getValue())));

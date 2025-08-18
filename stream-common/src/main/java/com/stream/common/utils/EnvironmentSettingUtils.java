@@ -30,6 +30,8 @@ public final class EnvironmentSettingUtils {
      * @param env
      */
     public static void defaultParameter(StreamExecutionEnvironment env) {
+        System.setProperty("HADOOP_USER_NAME","root");
+
         // 开启 checkpoint 支持在 STREAMING 模式下的 FlinkSink 操作
         env.enableCheckpointing(1000 * 30);
 //        env.setParallelism(6);
