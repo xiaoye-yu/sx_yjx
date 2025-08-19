@@ -68,6 +68,7 @@ public class DbusLogDataProcess2Kafka {
                         OffsetsInitializer.earliest()
                 ), WatermarkStrategy.noWatermarks(), "read_kafka_realtime_log"
         );
+
         SingleOutputStreamOperator<JSONObject> processDs = kafkaSourceDs.process(new ProcessFunction<String, JSONObject>() {
                     @Override
                     public void processElement(String s, ProcessFunction<String, JSONObject>.Context context, Collector<JSONObject> collector){

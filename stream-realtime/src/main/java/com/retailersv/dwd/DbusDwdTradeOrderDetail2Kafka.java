@@ -1,4 +1,4 @@
-package com.retailersv;
+package com.retailersv.dwd;
 
 import com.stream.common.utils.ConfigUtils;
 import com.stream.common.utils.EnvironmentSettingUtils;
@@ -104,7 +104,7 @@ public class DbusDwdTradeOrderDetail2Kafka {
                         "act.activity_id," +
                         "act.activity_rule_id," +
                         "cou.coupon_id," +
-                        "date_format(od.create_time, 'yyyy-MM-dd') date_id," +  // 年月日
+                        "date_format(FROM_UNIXTIME(cast(od.create_time as bigint) / 1000), 'yyyy-MM-dd') date_id," +
                         "od.create_time," +
                         "od.sku_num," +
                         "od.split_original_amount," +
@@ -118,8 +118,33 @@ public class DbusDwdTradeOrderDetail2Kafka {
                         "on od.id=act.order_detail_id " +
                         "left join order_detail_coupon cou " +
                         "on od.id=cou.order_detail_id ");
-        result.execute().print();
+//        result.execute().print();
 
+        tableEnv.executeSql(
+                "create table "+DWD_TRADE_ORDER_DETAIL+"(" +
+                        "id string," +
+                        "order_id string," +
+                        "user_id string," +
+                        "sku_id string," +
+                        "sku_name string," +
+                        "province_id string," +
+                        "activity_id string," +
+                        "activity_rule_id string," +
+                        "coupon_id string," +
+                        "date_id string," +
+                        "create_time string," +
+                        "sku_num string," +
+                        "split_original_amount string," +
+                        "split_activity_amount string," +
+                        "split_coupon_amount string," +
+                        "split_total_amount string," +
+                        "ts bigint," +
+                        "primary key(id) not enforced " +
+                        ")" + SqlUtil.getUpsertKafkaDDL(DWD_TRADE_ORDER_DETAIL));
+
+
+
+        result.executeInsert(DWD_TRADE_ORDER_DETAIL);
 
 
     }

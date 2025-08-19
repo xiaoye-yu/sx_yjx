@@ -1,4 +1,4 @@
-package com.retailersv;
+package com.retailersv.dwd;
 
 import com.stream.common.utils.ConfigUtils;
 import com.stream.common.utils.EnvironmentSettingUtils;
