@@ -10,7 +10,9 @@ import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import lombok.SneakyThrows;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.state.BroadcastState;
 import org.apache.flink.api.common.state.MapStateDescriptor;
+import org.apache.flink.api.common.state.ReadOnlyBroadcastState;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
@@ -21,14 +23,10 @@ import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.streaming.api.functions.co.BroadcastProcessFunction;
-import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.util.Collector;
 
 import java.sql.Connection;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * @Package com.retailersv.dwd
@@ -99,32 +97,73 @@ public class DbusDwdBaseDb2Kafka {
 
         BroadcastConnectedStream<JSONObject, TableProcessDwd> connectDs = jsonObjDs.connect(broadcastDs);
 
-        connectDs.process(
+        SingleOutputStreamOperator<Tuple2<JSONObject, TableProcessDwd>> splitDs = connectDs.process(
                 new BroadcastProcessFunction<JSONObject, TableProcessDwd, Tuple2<JSONObject, TableProcessDwd>>() {
                     private Map<String, TableProcessDwd> configMap = new HashMap<>();
+
                     @Override
                     public void open(Configuration parameters) throws Exception {
                         Connection connection = JdbcUtils.getMySQLConnection(
                                 ConfigUtils.getString("mysql.url"),
                                 ConfigUtils.getString("mysql.user"),
                                 ConfigUtils.getString("mysql.pwd"));
-                        String querySQL = "select * from realtime_v1_config.table_process_dim";
-                        List<TableProcessDim> tableProcessDims = JdbcUtils.queryList(connection, querySQL, TableProcessDim.class, true);
+                        String querySQL = "select * from realtime_v1_config.table_process_dwd";
+                        List<TableProcessDwd> tableProcessDwds = JdbcUtils.queryList(connection, querySQL, TableProcessDwd.class, true);
+                        for (TableProcessDwd tableProcessDwd : tableProcessDwds) {
+                            configMap.put(tableProcessDwd.getSourceTable(), tableProcessDwd);
+                        }
+
+                        connection.close();
                     }
 
                     @Override
-                    public void processElement(JSONObject jsonObject, BroadcastProcessFunction<JSONObject, TableProcessDwd, Tuple2<JSONObject, TableProcessDwd>>.ReadOnlyContext readOnlyContext, Collector<Tuple2<JSONObject, TableProcessDwd>> collector) throws Exception {
+                    public void processElement(JSONObject jsonObj, BroadcastProcessFunction<JSONObject, TableProcessDwd, Tuple2<JSONObject, TableProcessDwd>>.ReadOnlyContext readOnlyContext, Collector<Tuple2<JSONObject, TableProcessDwd>> collector) throws Exception {
+//                        {"op":"r","after":{"category_level":3,"category_id":178,"create_time":1639440000000,"attr_name":"像素","id":73},"source":{"server_id":0,"version":"1.9.7.Final","file":"","connector":"mysql","pos":0,"name":"mysql_binlog_source","row":0,"ts_ms":0,"snapshot":"false","db":"realtime_v1","table":"base_attr_info"},"ts_ms":1755243556351}
+                        String tableName = jsonObj.getJSONObject("source").getString("table");
+                        ReadOnlyBroadcastState<String, TableProcessDwd> broadcastState = readOnlyContext.getBroadcastState(mapStateDescriptor);
+                        TableProcessDwd tp = null;
+                        if ((tp = broadcastState.get(tableName)) != null || (tp = configMap.get(tableName)) != null) {
+                            JSONObject after = jsonObj.getJSONObject("after");
+                            deleteNotNeedColumns(after, tp.getSinkColumns());
+                            after.put("ts", jsonObj.getLongValue("ts_ms"));
+                            collector.collect(Tuple2.of(after, tp));
+                        }
 
                     }
 
                     @Override
-                    public void processBroadcastElement(TableProcessDwd tableProcessDwd, BroadcastProcessFunction<JSONObject, TableProcessDwd, Tuple2<JSONObject, TableProcessDwd>>.Context context, Collector<Tuple2<JSONObject, TableProcessDwd>> collector) throws Exception {
+                    public void processBroadcastElement(TableProcessDwd tp, BroadcastProcessFunction<JSONObject, TableProcessDwd, Tuple2<JSONObject, TableProcessDwd>>.Context context, Collector<Tuple2<JSONObject, TableProcessDwd>> collector) throws Exception {
+                        String op = tp.getOp();
+                        BroadcastState<String, TableProcessDwd> broadcastState = context.getBroadcastState(mapStateDescriptor);
 
+                        if ("d".equals(op)) {
+                            configMap.remove(tp.getSourceTable());
+                            broadcastState.remove(tp.getSourceTable());
+                        } else {
+                            configMap.put(tp.getSourceTable(), tp);
+                            broadcastState.put(tp.getSourceTable(), tp);
+                        }
+
+                    }
+
+                    @Override
+                    public void close() throws Exception {
+                        super.close();
                     }
                 }
-        )
+        );
+        splitDs.print();
+        splitDs.sinkTo(KafkaUtils.getKafkaSinkDwd());
+
+
 
         env.execute();
 
+    }
+
+    private static void deleteNotNeedColumns(JSONObject jsonObj, String sinkColumns) {
+        List<String> columnList = Arrays.asList(sinkColumns.split(","));
+        Set<Map.Entry<String, Object>> entrySet = jsonObj.entrySet();
+        entrySet.removeIf(entry -> !columnList.contains(entry.getKey()));
     }
 }
