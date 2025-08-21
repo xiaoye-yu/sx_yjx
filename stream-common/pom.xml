@@ -64,10 +64,6 @@
         </dependency>
 
 
-        <dependency>
-            <groupId>org.apache.flink</groupId>
-            <artifactId>flink-statebackend-rocksdb</artifactId>
-        </dependency>
 
         <dependency>
             <groupId>redis.clients</groupId>
@@ -109,6 +105,7 @@
         <dependency>
             <groupId>com.janeluo</groupId>
             <artifactId>ikanalyzer</artifactId>
+            <version>2012_u6</version>
         </dependency>
 
         <dependency>
