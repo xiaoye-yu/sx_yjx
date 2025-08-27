@@ -46,3 +46,7 @@ hive.conf.dir=D:/2211a/sx_yjx/stream-realtime/src/main/resources
 # Doris
 doris.fe.nodes=cdh01:8131,cdh01:8131,cdh03:8131
 doris.database=gmall2025_realtime
+
+
+# 工单 3
+task.dwd.trade.order.detail=dwd_trade_order_detail_task3
