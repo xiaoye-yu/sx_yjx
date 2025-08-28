@@ -93,7 +93,7 @@ public class DwdTradeOrderDetail2Kafka {
                         "join order_info oi on od.order_id=oi.id " +
                         "left join sku_info si on od.sku_id=si.id");
 
-        result.execute().print();
+//        result.execute().print();
 
         // 6. 目标 DWD 表
         tableEnv.executeSql(
@@ -107,13 +107,12 @@ public class DwdTradeOrderDetail2Kafka {
                         "trademark_id string," +
                         "order_price decimal(10,2)," +
                         "sku_num int," +
-                        "order_status string," +
                         "create_time string," +
                         "dt string," +
                         "primary key(order_id) not enforced " +
                         ")" + SqlUtil.getUpsertKafkaDDL(DWD_TRADE_ORDER_DETAIL_TASK3));
 
         // 7. 写入 Kafka
-//        result.executeInsert(DWD_TRADE_ORDER_DETAIL_TASK3);
+        result.executeInsert(DWD_TRADE_ORDER_DETAIL_TASK3);
     }
 }
